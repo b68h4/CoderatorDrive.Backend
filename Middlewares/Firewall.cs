@@ -20,8 +20,8 @@ namespace Depo.Middlewares
 
         public async Task Invoke(HttpContext con)
         {
-            string[] hostsprod = { "depo.coderator.net" };
-            string[] hostsdev = { "localhost:3933", "localhost", "depo.coderator.net", "aom.coderator.net", "10.16.1.5", "10.16.1.5:3933", "192.168.1.22", "192.168.1.22:3933" };
+            string[] hostsprod = { "alloweddomain.com" };
+         
             var hosts = hostsprod;
             var origin = con.Request.Headers["Origin"].ToString();
             var referer = con.Request.Headers["Referer"].ToString();

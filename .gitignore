@@ -9,7 +9,7 @@
 *.user
 *.userosscache
 *.sln.docstates
-data\*
+
 *rep.txt
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -362,3 +362,4 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+data/Google.Apis.Auth.OAuth2.Responses.TokenResponse-CoderatorArsiv

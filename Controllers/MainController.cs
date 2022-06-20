@@ -47,7 +47,7 @@ namespace Depo.Controllers
                     req.IncludeItemsFromAllDrives = true;
                     req.OrderBy = "folder,title";
                     req.Corpora = "drive";
-                    req.DriveId = "DRIVEFOLDERID";
+                    req.DriveId = "MAINFOLDERID";
                     req.MaxResults = 30000;
                   
                 
