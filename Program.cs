@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Sentry;
 
 namespace Depo
 {
@@ -24,7 +25,9 @@ namespace Depo
                     {
                         o.Dsn = "SENTRYDSN";
                         // When configuring for the first time, to see what the SDK is doing:
-                        o.Debug = true;
+                        o.DiagnosticLevel = SentryLevel.Error;
+                        
+                        o.Debug = false;
                         // Set traces_sample_rate to 1.0 to capture 100% of transactions for performance monitoring.
                         // We recommend adjusting this value in production.
                         o.TracesSampleRate = 1.0;

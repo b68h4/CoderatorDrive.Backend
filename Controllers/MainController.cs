@@ -10,6 +10,7 @@ using Depo.Models;
 using Google.Apis.Drive.v2;
 using Google.Apis.Drive.v2.Data;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Newtonsoft.Json;
 
 namespace Depo.Controllers
@@ -41,23 +42,20 @@ namespace Depo.Controllers
                 else
                 {
                     var req = svc.Files.List();
-                    // req.IncludeItemsFromAllDrives = true;
+                    
                     req.SupportsAllDrives = true;
-                    req.IncludeTeamDriveItems = true;
+                    req.IncludeItemsFromAllDrives = true;
                     req.OrderBy = "folder,title";
                     req.Corpora = "drive";
                     req.DriveId = "DRIVEFOLDERID";
                     req.MaxResults = 30000;
-                    //gettd.Q = $"'ANOTHERTESTFOLDERID' in parents";
+                  
                 
                     req.Q = $"'{id}' in parents and trashed=false";
                     var reqResult = await req.ExecuteAsync();
                     var filtResult = new List<DriveResult>();
-
                     foreach (var item in reqResult.Items)
                     {
-
-                   
                         filtResult.Add(new DriveResult()
                         {
                             Id = Base64.Base64Encode(item.Id),
@@ -67,6 +65,7 @@ namespace Depo.Controllers
                             MimeType = item.MimeType
                         });
                     }
+                   
 
                     await cache.CreateCache(id, filtResult);
                     result = filtResult;

@@ -12,8 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AspNetCoreRateLimit" Version="4.0.1" />
     <PackageReference Include="Google.Apis.Drive.v2" Version="1.52.0.2354" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="Pastel" Version="2.1.0" />
     <PackageReference Include="Sentry.AspNetCore" Version="3.9.3" />
     <PackageReference Include="Telegram.Bot" Version="16.0.2" />
   </ItemGroup>

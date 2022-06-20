@@ -20,26 +20,28 @@ namespace Depo.Components
             public bool Error { get; set; }
             public string ErrorMessage { get; set; }
         }
-        public static async Task<File> GetFileMeta(DriveService drive,string fileid)
+        public static async Task<File> GetFileMeta(DriveService drive, string fileid)
         {
+
             var file = drive.Files.Get(fileid);
             file.SupportsAllDrives = true;
-                       
             return await file.ExecuteAsync();
+
+
         }
-        public static async Task<DriveResponse> SendRequest(DriveService drive,string fileid,string range)
+        public static async Task<DriveResponse> SendRequest(DriveService drive, string fileid, string range)
         {
             var cli = new HttpClient(drive.HttpClient.MessageHandler);
             var req = new HttpRequestMessage(HttpMethod.Get, $"https://www.googleapis.com/drive/v3/files/{fileid}?alt=media");
 
-          
+
             if (!string.IsNullOrEmpty(range))
             {
-                req.Headers.Add("Range", range.ToString());
+                req.Headers.Add("Range", range);
             }
             var resp = await cli.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
             var ctype = resp.Content.Headers.ContentType.MediaType;
-          
+
             if (ctype == "application/json")
             {
                 var content = await resp.Content.ReadAsStringAsync();

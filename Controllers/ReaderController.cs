@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Depo.Components;
 using Google.Apis.Drive.v2;
 using Newtonsoft.Json.Linq;
+using Sentry;
 
 namespace Depo.Controllers
 {
@@ -15,7 +16,7 @@ namespace Depo.Controllers
     [ApiController]
     public class ReaderController : ControllerBase
     {
-          public DriveService drive { get; set; }
+        public DriveService drive { get; set; }
         public ReaderController(DriveApiService _svc)
         {
             drive = _svc.service;
@@ -23,59 +24,45 @@ namespace Depo.Controllers
         [HttpGet, DisableRequestSizeLimit]
         public async Task<ActionResult> ReaderBridge([FromQuery(Name = "data")] string fileid)
         {
-
             if (!string.IsNullOrEmpty(fileid))
             {
-                Console.WriteLine($"{DateTime.Now} PDF İsteği: {Response.HttpContext.Connection.RemoteIpAddress}");
+
                 var decoded = Base64.Base64Decode(fileid);
-                var file = drive.Files.Get(decoded);
-                file.SupportsAllDrives = true;
-                file.SupportsTeamDrives = true;
-                var fileinf = await file.ExecuteAsync();
-                var cli = new HttpClient(drive.HttpClient.MessageHandler);
-                
-                var req = new HttpRequestMessage(HttpMethod.Get, $"https://www.googleapis.com/drive/v3/files/{decoded}?alt=media&acknowledgeAbuse=true");
-            
-                var resp = await cli.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
-                var contenttype = resp.Content.Headers.ContentType.MediaType;
-                if (contenttype == "application/json")
+                var meta = await ApiBase.GetFileMeta(drive, decoded);
+                Logger.WriteLine("ReaderPDF", Request.Method, HttpContext.Connection.RemoteIpAddress.ToString(), $"Client requested the pdf document. ID: {decoded}");
+               
+                var result = await ApiBase.SendRequest(drive, decoded, null);
+                var resp = result.HttpResponse;
+                if (!result.Error)
                 {
-                    var message = JObject.Parse(resp.Content.ReadAsStringAsync().Result).SelectToken("error.message");
+                    string conlength = resp.Content.Headers.ContentLength.ToString();
 
-                    if (message.ToString() == "The download quota for this file has been exceeded.")
+                    if (!string.IsNullOrEmpty(conlength))
                     {
-                        Console.WriteLine($"Can't return PDF Reason: Quota {Response.HttpContext.Connection.RemoteIpAddress}");
-                        return Content("Error with getting PDF!, Reason: Quota");
-
+                        Response.Headers.Add("Content-Length", conlength);
                     }
-                    else
-                    {
-                        Console.WriteLine($"Can't return PDF Reason: Drive Json Response {Response.HttpContext.Connection.RemoteIpAddress}");
-                        return Content("Error with getting PDF!, Reason: Drive Json Response");
-                    }
+                    return File(await resp.Content.ReadAsStreamAsync(), "application/pdf", meta.OriginalFilename, true);
                 }
                 else
                 {
-                    string resplength = resp.Content.Headers.ContentLength.ToString();
-                    if (!string.IsNullOrEmpty(resplength))
-                    {
-                        Response.Headers.Add("Content-Length", resplength);
-                    }
-                    return File(await resp.Content.ReadAsStreamAsync(), "application/pdf", fileinf.OriginalFilename, true);
 
-                      
-                   
+                    Response.StatusCode = 403;
+                    return Content(result.ErrorMessage);
+
+
                 }
+
 
 
             }
             else
             {
-                Console.WriteLine(
-                    $"Can't return PDF Reason: Data Blank {Response.HttpContext.Connection.RemoteIpAddress}");
-                return Content("Error with getting PDF!, Reason: data blank");
+                SentrySdk.CaptureMessage(
+                     $"Can't return media Reason: Wrong Data {Response.HttpContext.Connection.RemoteIpAddress}");
+                return Content("Error with getting media!, Reason: Wrong Data");
             }
-            // }
+
+
 
         }
     }

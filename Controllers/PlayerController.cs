@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Depo.Components;
 using Google.Apis.Drive.v2;
 using Newtonsoft.Json.Linq;
+using Sentry;
 
 namespace Depo.Controllers
 {
@@ -27,74 +28,56 @@ namespace Depo.Controllers
 
             if (!string.IsNullOrEmpty(fileid))
             {
-                Console.WriteLine($"{DateTime.Now} Video İsteği: {Response.HttpContext.Connection.RemoteIpAddress}");
+
                 var decoded = Base64.Base64Decode(fileid);
-                var file = drive.Files.Get(decoded);
-                file.SupportsAllDrives = true;
-                file.SupportsTeamDrives = true;
-                var fileinf = await file.ExecuteAsync();
-                var cli = new HttpClient(drive.HttpClient.MessageHandler);
-              
-                var req = new HttpRequestMessage(HttpMethod.Get, $"https://www.googleapis.com/drive/v3/files/{decoded}?alt=media&acknowledgeAbuse=true");
+                var meta = await ApiBase.GetFileMeta(drive, decoded);
+                Logger.WriteLine("Player", Request.Method, HttpContext.Connection.RemoteIpAddress.ToString(), $"Client requested the video. ID: {decoded}");
                 var range = Request.Headers["Range"];
-                if (!string.IsNullOrEmpty(range))
+                var result = await ApiBase.SendRequest(drive, decoded, range);
+                var resp = result.HttpResponse;
+                if (!result.Error)
                 {
-                    req.Headers.Add("Range", range.ToString());
-                }
-                var resp = await cli.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
-                var contenttype = resp.Content.Headers.ContentType.MediaType;
-                if (contenttype == "application/json")
-                {
-                    var message = JObject.Parse(resp.Content.ReadAsStringAsync().Result).SelectToken("error.message");
-
-                    if (message.ToString() == "The download quota for this file has been exceeded.")
+                    string conlength = resp.Content.Headers.ContentLength.ToString();
+                    if (!string.IsNullOrEmpty(range))
                     {
-                        Console.WriteLine($"Can't return media Reason: Quota {Response.HttpContext.Connection.RemoteIpAddress}");
-                        return Content("Error with getting media!, Reason: Quota");
+                        Response.StatusCode = 206;
+                        string conrange = resp.Content.Headers.GetValues("Content-Range").FirstOrDefault();
+                        Response.Headers.Add("Content-Range", conrange);
 
+                        if (!string.IsNullOrEmpty(conlength))
+                        {
+                            Response.Headers.Add("Content-Length", conlength);
+                        }
+                        return new FileStreamResult(await resp.Content.ReadAsStreamAsync(), meta.MimeType) { EnableRangeProcessing = true };
                     }
                     else
                     {
-                        Console.WriteLine($"Can't return media Reason: Drive Json Response {Response.HttpContext.Connection.RemoteIpAddress}");
-                        return Content("Error with getting media!, Reason: Drive Json Response");
+                        if (!string.IsNullOrEmpty(conlength))
+                        {
+                            Response.Headers.Add("Content-Length", conlength);
+                        }
+                        return File(await resp.Content.ReadAsStreamAsync(), meta.MimeType, meta.OriginalFilename, true);
                     }
                 }
                 else
                 {
-                    string resplength = resp.Content.Headers.ContentLength.ToString();
-                    if (!string.IsNullOrEmpty(range))
-                    {
-                        string resprange = resp.Content.Headers.GetValues("Content-Range").FirstOrDefault();
 
-                        Response.StatusCode = 206;
-                        Response.Headers.Add("Content-Range", resprange);
-                        if (!string.IsNullOrEmpty(resplength))
-                        {
-                            Response.Headers.Add("Content-Length", resplength);
-                        }
+                    Response.StatusCode = 403;
+                    return Content(result.ErrorMessage);
 
-                        return new FileStreamResult(await resp.Content.ReadAsStreamAsync(), fileinf.MimeType) { EnableRangeProcessing = true };
-                    }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(resplength))
-                        {
-                            Response.Headers.Add("Content-Length", resplength);
-                        }
-                        return File(await resp.Content.ReadAsStreamAsync(), fileinf.MimeType, fileinf.OriginalFilename, true);
-                    }
 
                 }
+
 
 
             }
             else
             {
-                Console.WriteLine(
-                    $"Can't return media Reason: Data Blank {Response.HttpContext.Connection.RemoteIpAddress}");
+                SentrySdk.CaptureMessage(
+                     $"Can't return media Reason: Data Blank {Response.HttpContext.Connection.RemoteIpAddress}");
                 return Content("Error with getting media!, Reason: data blank");
             }
-            // }
+
 
         }
     }

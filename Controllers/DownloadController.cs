@@ -14,11 +14,11 @@ namespace Depo.Controllers
     [Route("System/[controller]")]
     [ApiController]
     public class DownloadController : ControllerBase
-    { 
+    {
         public DriveService drive { get; set; }
         public DownloadStorage _svc { get; set; }
 
-        public DownloadController(DownloadStorage stor,DriveApiService _drive)
+        public DownloadController(DownloadStorage stor, DriveApiService _drive)
         {
             _svc = stor;
             drive = _drive.service;
@@ -30,82 +30,47 @@ namespace Depo.Controllers
             if (!string.IsNullOrEmpty(token))
             {
                 var data = await _svc.GetData(token);
-                if (data != null)
+                if (data != null && !string.IsNullOrEmpty(data.FileId))
                 {
-                    var fileid = data.FileId;
-                    if (!string.IsNullOrEmpty(fileid))
+                    Logger.WriteLine("Download", Request.Method, HttpContext.Connection.RemoteIpAddress.ToString(), $"Download requested with {token}.");
+                    var meta = await ApiBase.GetFileMeta(drive, data.FileId);
+                    var range = Request.Headers["Range"];
+                    var result = await ApiBase.SendRequest(drive, data.FileId, range);
+                    var resp = result.HttpResponse;
+                    if (!result.Error)
                     {
-
-                        Console.WriteLine($"{DateTime.Now} Download İsteği: {Response.HttpContext.Connection.RemoteIpAddress}");
-                        string decoded = fileid;
-                        //var decoded = Base64.Base64Decode(fileid);
-                        var file = drive.Files.Get(decoded);
-                        file.SupportsAllDrives = true;
-                       
-                        var fileinf = await file.ExecuteAsync();
-                        var cli = new HttpClient(drive.HttpClient.MessageHandler);
-                        var req = new HttpRequestMessage(HttpMethod.Get, $"https://www.googleapis.com/drive/v3/files/{decoded}?alt=media&acknowledgeAbuse=true");
-
-                        var range = Request.Headers["Range"];
+                        string conlength = resp.Content.Headers.ContentLength.ToString();
                         if (!string.IsNullOrEmpty(range))
                         {
-                            req.Headers.Add("Range", range.ToString());
-                        }
-                        var resp = await cli.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+                            Response.StatusCode = 206;
+                            Response.Headers.Add("Range", range.ToString());
 
-                        var contenttype = resp.Content.Headers.ContentType.MediaType;
-
-                        if (contenttype == "application/json")
-                        {
-                            var message = JObject.Parse(await resp.Content.ReadAsStringAsync()).SelectToken("error.message");
-
-                            if (message.ToString() == "The download quota for this file has been exceeded.")
+                            if (!string.IsNullOrEmpty(conlength))
                             {
-                                Response.StatusCode = 403;
-                                throw new Exception("Drive Kotası Aşırı Dosya İndirmesinden Dolayı Aşılmıştır.Ortalama 24 Saatte Sıfırlanır.");
-
+                                Response.Headers.Add("Content-Length", conlength);
                             }
-                            else
-                            {
-                                Response.StatusCode = 403;
-                                throw new Exception(message.ToString());
-                            }
+                            return new FileStreamResult(await resp.Content.ReadAsStreamAsync(), meta.MimeType) { EnableRangeProcessing = true };
                         }
                         else
                         {
-
-
-                            string resplength = resp.Content.Headers.ContentLength.ToString();
-                            if (!string.IsNullOrEmpty(range))
+                            if (!string.IsNullOrEmpty(conlength))
                             {
-                                string resprange = resp.Content.Headers.GetValues("Content-Range").FirstOrDefault();
-                                Response.StatusCode = 206;
-                                Response.Headers.Add("Range", range.ToString());
-                                //Response.Headers.Add("Content-Range", resprange);
-                                if (!string.IsNullOrEmpty(resplength))
-                                {
-                                    Response.Headers.Add("Content-Length", resplength);
-                                }
-                                return new FileStreamResult(await resp.Content.ReadAsStreamAsync(), fileinf.MimeType) { EnableRangeProcessing = true };
+                                Response.Headers.Add("Content-Length", conlength);
                             }
-                            else
-                            {
-                                if (!string.IsNullOrEmpty(resplength))
-                                {
-                                    Response.Headers.Add("Content-Length", resplength);
-                                }
-                                return File(await resp.Content.ReadAsStreamAsync(), fileinf.MimeType, fileinf.OriginalFilename, true);
-                            }
-
+                            return File(await resp.Content.ReadAsStreamAsync(), meta.MimeType, meta.OriginalFilename, true);
                         }
-
-
                     }
                     else
                     {
+
                         Response.StatusCode = 403;
-                        return Content("Token Geçersiz. Lütfen indirmeyi arşivlerden tekrar başlatın.");
+                        return Content(result.ErrorMessage);
+
+
                     }
+
+
+
 
                 }
                 else

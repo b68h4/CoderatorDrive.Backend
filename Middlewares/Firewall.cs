@@ -4,7 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
+using Newtonsoft.Json;
+using Depo.Components;
 namespace Depo.Middlewares
 {
     // You may need to install the Microsoft.AspNetCore.Http.Abstractions package into your project
@@ -19,23 +20,29 @@ namespace Depo.Middlewares
 
         public async Task Invoke(HttpContext con)
         {
-            string[] hostsprod = {"depo.coderator.net","aom.coderator.net"};
-            string[] hostsdev = {"localhost:3933","localhost","depo.coderator.net","aom.coderator.net","10.16.1.5","10.16.1.5:3933","192.168.1.22","192.168.1.22:3933"};
-            var hosts = hostsdev;
+            string[] hostsprod = { "depo.coderator.net" };
+            string[] hostsdev = { "localhost:3933", "localhost", "depo.coderator.net", "aom.coderator.net", "10.16.1.5", "10.16.1.5:3933", "192.168.1.22", "192.168.1.22:3933" };
+            var hosts = hostsprod;
             var origin = con.Request.Headers["Origin"].ToString();
             var referer = con.Request.Headers["Referer"].ToString();
+            var ipadr = con.Connection.RemoteIpAddress.ToString();
 
             if (hosts.Contains(con.Request.Host.Value) && hosts.Any((a) => origin.Contains(a)) || hosts.Any((b) => referer.Contains(b)))
             {
-                
+
                 await _next(con);
+                Logger.WriteLine("FWLogger", con.Response.StatusCode.ToString(), ipadr, $"CF-Ray: {con.Request.Headers["CF-Ray"]} / CF-Connecting: {con.Request.Headers["CF-Connecting-IP"]} / X-Forwarded: {con.Request.Headers["X-Forwarded-For"]} / User-Agent: {con.Request.Headers["User-Agent"]} / Range: {con.Request.Headers["Range"]} / Referer: {referer}");
             }
             else
             {
-                Console.WriteLine($"{DateTime.Now.ToString()} Request Denied {con.Connection.RemoteIpAddress.ToString()}");
+                con.Response.StatusCode = 403;
                 await con.Response.WriteAsync("Request Denied.");
+
+                Logger.WriteLine("Firewall", con.Response.StatusCode.ToString(), ipadr, $"Request Denied.");
+
             }
-           
+
         }
     }
+
 }

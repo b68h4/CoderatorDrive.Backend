@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 using Depo.Components;
 using Depo.Middlewares;
 using Microsoft.AspNetCore.HttpOverrides;
-
+using AspNetCoreRateLimit;
 namespace Depo
 {
     public class Startup
@@ -27,6 +27,7 @@ namespace Depo
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddMvc();
             services.AddTransient<DownloadStorage>();
             services.AddTransient<Cache>();
             services.AddControllers();
@@ -35,7 +36,7 @@ namespace Depo
             services.AddSentry();
             services.AddCors(options =>
             {
-                
+
                 options.AddDefaultPolicy(
                     builder => builder.AllowAnyHeader().AllowAnyOrigin().AllowAnyMethod());
             });
@@ -44,6 +45,13 @@ namespace Depo
                 options.ForwardedHeaders =
                     ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
             });
+
+            // services.AddOptions();
+            // services.Configure<IpRateLimitOptions>(Configuration.GetSection("IpRateLimiting"));
+            // services.Configure<IpRateLimitPolicies>(Configuration.GetSection("IpRateLimitPolicies"));
+            // services.AddInMemoryRateLimiting();
+
+            // services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -53,6 +61,9 @@ namespace Depo
             {
                 app.UseDeveloperExceptionPage();
             }
+
+
+
             app.UseForwardedHeaders();
             app.UseSentryTracing();
             app.UseRouting();
@@ -62,10 +73,10 @@ namespace Depo
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
-                
+
             });
-            
-            //DriveAPI.StartDriveAPI();
+            //app.UseIpRateLimiting();
+
         }
     }
 }
