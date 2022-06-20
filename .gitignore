@@ -10,7 +10,7 @@
 *.userosscache
 *.sln.docstates
 data\*
-rep.txt
+*rep.txt
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
